@@ -1,8 +1,6 @@
 package com.example.demo.models;
 
 import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Column;
@@ -10,19 +8,25 @@ import jakarta.persistence.Column;
 @Entity
 @Table(name = "police_station")
 public class PoliceStation {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    public int stationId;  // Java convention: camelCase
-    public String name;
-    public String contactInfo;  // Java convention: camelCase
 
-    @Column(name = "Lmgrc_code")  // Map to your exact database column
-    public String lmgrcCode;  // Java convention: camelCase
+    @Id
+    @Column(name = "station_id")
+    private Integer stationId;
+
+    @Column(name = "name")
+    private String name;
+
+    @Column(name = "contact_info")
+    private String contactInfo;
+
+    @Column(name = "Lmgrc_code")
+    private String lmgrcCode;
 
     // Default constructor (required by JPA)
-    public PoliceStation() {}
+    public PoliceStation() {
+    }
 
-    public PoliceStation(int stationId, String name, String contactInfo, String lmgrcCode) {
+    public PoliceStation(Integer stationId, String name, String contactInfo, String lmgrcCode) {
         this.stationId = stationId;
         this.name = name;
         this.contactInfo = contactInfo;
@@ -30,11 +34,11 @@ public class PoliceStation {
     }
 
     // Getters and Setters
-    public int getStationId() {
+    public Integer getStationId() {
         return stationId;
     }
 
-    public void setStationId(int stationId) {
+    public void setStationId(Integer stationId) {
         this.stationId = stationId;
     }
 

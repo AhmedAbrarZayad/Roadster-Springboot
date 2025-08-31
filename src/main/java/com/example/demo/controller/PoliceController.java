@@ -19,4 +19,9 @@ public class PoliceController {
     public List<PoliceStation> getAllPoliceStations() {
         return policeStationService.getAllPoliceStations();
     }
+
+    @GetMapping("/with-districts")
+    public List<Object[]> getPoliceStationsWithDistricts() {
+        return policeStationService.getPoliceStationsWithDistrict();
+    }
 }

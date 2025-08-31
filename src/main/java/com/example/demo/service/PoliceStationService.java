@@ -18,4 +18,8 @@ public class PoliceStationService {
     public PoliceStation getPoliceStationById(int id) {
         return policeRepository.findById(id).orElse(null);
     }
+
+    public List<Object[]> getPoliceStationsWithDistrict() {
+        return policeRepository.findPoliceStationNameAndDistrict();
+    }
 }
