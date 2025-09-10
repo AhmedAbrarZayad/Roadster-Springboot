@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Location Tracker</title>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+        
+        #map {
+            height: 500px;
+            width: 100%;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .status {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .connection-status {
+            font-weight: bold;
+        }
+        
+        .connected {
+            color: #28a745;
+        }
+        
+        .disconnected {
+            color: #dc3545;
+        }
+        
+        .location-info {
+            background-color: #e9ecef;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+        
+        .location-item {
+            margin-bottom: 10px;
+            padding: 10px;
+            background-color: white;
+            border-radius: 5px;
+            border-left: 4px solid #007bff;
+        }
+        
+        .user-id {
+            font-weight: bold;
+            color: #007bff;
+        }
+        
+        .coordinates {
+            color: #666;
+            font-size: 0.9em;
+        }
+        
+        .timestamp {
+            color: #999;
+            font-size: 0.8em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚗 Live Location Tracker</h1>
+        
+        <div class="status">
+            <div>
+                <span class="connection-status" id="connectionStatus">Connecting...</span>
+            </div>
+            <div>
+                <button id="connectBtn" onclick="connect()">Connect</button>
+                <button id="disconnectBtn" onclick="disconnect()" disabled>Disconnect</button>
+            </div>
+        </div>
+        
+        <div id="map"></div>
+        
+        <div class="location-info">
+            <h3>📍 Recent Locations</h3>
+            <div id="locationList">
+                <p>No locations received yet...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let stompClient = null;
+        let map = null;
+        let markers = {};
+        let locationCount = 0;
+
+        // Initialize map
+        function initMap() {
+            map = L.map('map').setView([23.8103, 90.4125], 10); // Centered on Dhaka, Bangladesh
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+        }
+
+        // Connect to WebSocket
+        function connect() {
+            const socket = new SockJS('/ws');
+            stompClient = Stomp.over(socket);
+            
+            stompClient.connect({}, function (frame) {
+                setConnected(true);
+                console.log('Connected: ' + frame);
+                
+                // Subscribe to location updates
+                stompClient.subscribe('/topic/locations', function (location) {
+                    showLocation(JSON.parse(location.body));
+                });
+                
+            }, function(error) {
+                console.log('Connection error: ' + error);
+                setConnected(false);
+            });
+        }
+
+        // Disconnect from WebSocket
+        function disconnect() {
+            if (stompClient !== null) {
+                stompClient.disconnect();
+            }
+            setConnected(false);
+            console.log("Disconnected");
+        }
+
+        // Update connection status
+        function setConnected(connected) {
+            const statusElement = document.getElementById('connectionStatus');
+            const connectBtn = document.getElementById('connectBtn');
+            const disconnectBtn = document.getElementById('disconnectBtn');
+            
+            if (connected) {
+                statusElement.textContent = 'Connected';
+                statusElement.className = 'connection-status connected';
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+            } else {
+                statusElement.textContent = 'Disconnected';
+                statusElement.className = 'connection-status disconnected';
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+            }
+        }
+
+        // Show location on map and in list
+        function showLocation(location) {
+            console.log('Received location:', location);
+            
+            const lat = location.latitude;
+            const lng = location.longitude;
+            const userId = location.userId || 'Unknown User';
+            
+            // Add or update marker on map
+            if (markers[userId]) {
+                // Update existing marker
+                markers[userId].setLatLng([lat, lng]);
+            } else {
+                // Create new marker
+                const marker = L.marker([lat, lng]).addTo(map);
+                marker.bindPopup(`
+                    <b>${userId}</b><br>
+                    Lat: ${lat.toFixed(6)}<br>
+                    Lng: ${lng.toFixed(6)}<br>
+                    Speed: ${location.speed || 0} km/h<br>
+                    Time: ${new Date(location.timestamp).toLocaleString()}
+                `);
+                markers[userId] = marker;
+            }
+            
+            // Center map on latest location
+            map.setView([lat, lng], 15);
+            
+            // Update location list
+            updateLocationList(location);
+        }
+
+        // Update location list
+        function updateLocationList(location) {
+            const locationList = document.getElementById('locationList');
+            
+            if (locationCount === 0) {
+                locationList.innerHTML = '';
+            }
+            
+            const locationItem = document.createElement('div');
+            locationItem.className = 'location-item';
+            locationItem.innerHTML = `
+                <div class="user-id">${location.userId || 'Unknown User'}</div>
+                <div class="coordinates">📍 ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}</div>
+                <div class="timestamp">🕐 ${new Date(location.timestamp).toLocaleString()}</div>
+                ${location.speed ? `<div>🚗 Speed: ${location.speed.toFixed(1)} km/h</div>` : ''}
+                ${location.accuracy ? `<div>🎯 Accuracy: ${location.accuracy.toFixed(1)}m</div>` : ''}
+            `;
+            
+            locationList.insertBefore(locationItem, locationList.firstChild);
+            
+            // Keep only last 10 locations
+            if (locationList.children.length > 10) {
+                locationList.removeChild(locationList.lastChild);
+            }
+            
+            locationCount++;
+        }
+
+        // Initialize everything when page loads
+        window.onload = function() {
+            initMap();
+            connect();
+        };
+
+        // Cleanup on page unload
+        window.onbeforeunload = function() {
+            disconnect();
+        };
+    </script>
+</body>
+</html>
